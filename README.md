@@ -18,11 +18,11 @@ Tensorflow and Theano backend also work fine in Keras. Please refer to some exam
 
 Reference:
 
-- RBM, DBN:
+- RBM, DBN : 
  https://github.com/wuaalb/keras_extensions
 
-- RNNRBM:
+- RNNRBM : 
  http://deeplearning.net/tutorial/rnnrbm.html
 
-- Variational LSTM Auto-Encoder
+- Variational LSTM Auto-Encoder : 
  https://github.com/jayhack/LSTMVRAE

@@ -1,10 +1,16 @@
-# A collection of small extensions to Keras
+# A collection of extensions library for Keras
 
-Extensions
+Includes:
 
-- Restricted Boltzmann Machine (RBM)
-- Gaussian-Bernoulli Restricted Boltzmann Machine (GB-RBM)
-- Momentum schedule
-- Logging helpers (simultaneous logging to console and log file)
-
-Note that some of these extensions are very coupled to Keras' internals which change from time to time. Whenever these extensions break due to changes in Keras, either the extensions need to be updated to reflect the changes, or an older version of Keras should be used.
+ - Restricted Boltzmann Machine (RBM)
+   - GGaussian-Bernoulli
+   - NRLU hidden unit
+   - Softmax hidden unit
+   - Persistent Contrastive divergence
+   - Dropout for hidden unit
+ - Deep Belief Network (DBN)
+ - RNN-RBM
+  - independent RBM pre-training
+ -Variational LSTM Auto-Encoder
+ 
+These extensions were validated in Keras 1.2.0 and python 3.5 (Anaconda)

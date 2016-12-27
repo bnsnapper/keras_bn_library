@@ -14,7 +14,7 @@ Includes:
  - Variational LSTM auto-encoder
  
 These extensions were validated in Keras 1.2.0 and python 3.5 (Anaconda).
-Tensorflow and Theano backend also work fine in Keras.
+Tensorflow and Theano backend also work fine in Keras. Please refer to some examples to use libraries.
 
 Reference:
 

@@ -10,19 +10,19 @@ Includes:
    - Dropout for hidden unit
  - Deep Belief Network (DBN)
  - RNN-RBM
-   - independent RBM pre-training
- -Variational LSTM Auto-Encoder
+   - independent RBM PreTraining
+ -Variational LSTM AutoEncoder
  
 These extensions were validated in Keras 1.2.0 and python 3.5 (Anaconda).
 Tensorflow and Theano backend also work fine.
 
 Reference:
 
-RBM, DBN:
+- RBM, DBN:
  https://github.com/wuaalb/keras_extensions
 
-RNNRBM:
+- RNNRBM:
  http://deeplearning.net/tutorial/rnnrbm.html
 
-Variational LSTM Auto-Encoder
+- Variational LSTM Auto-Encoder
  https://github.com/jayhack/LSTMVRAE

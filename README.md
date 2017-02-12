@@ -12,6 +12,7 @@ Includes:
  - RNN-RBM
    - independent RBM pre-training
  - Variational LSTM auto-encoder
+ - Quasi Reccurent NN
  
 These extensions were validated in Keras 1.2.0 and python 3.5 (Anaconda).
 Tensorflow and Theano backend also work fine in Keras. Please refer to some examples to use libraries.
@@ -26,3 +27,6 @@ Reference:
 
 - Variational LSTM Auto-Encoder : 
  https://github.com/jayhack/LSTMVRAE
+
+- Quasi Reccurent NN
+ https://arxiv.org/pdf/1611.01576v1.pdf

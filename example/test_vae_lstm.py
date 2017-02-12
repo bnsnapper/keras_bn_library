@@ -59,24 +59,24 @@ print(expected_output.shape)
 
 print('Creating Model')
 x = Input(batch_shape=(batch_size, tsteps, input_dim))
-h = LSTM(lstm_dim, stateful=False)(x)
+h = LSTM(lstm_dim, stateful=False, activation='linear')(x)
 z_mean = Dense(latent_dim)(h)
 z_log_var = Dense(latent_dim)(h)
 output=Dense(input_dim)(z_mean)
 
 def sampling(args):
-	z_mean, z_log_var = args 
-	epsilon = K.random_normal(shape=(batch_size, latent_dim), mean=0., 
-			                         std=epsilon_std) 
-	return z_mean + K.exp(z_log_var / 2) * epsilon 
+	z_mean, z_log_var = args
+	epsilon = K.random_normal(shape=(batch_size, latent_dim), mean=0.,
+			                         std=epsilon_std)
+	return z_mean + K.exp(z_log_var / 2) * epsilon
 
-z = Lambda(sampling, output_shape=(latent_dim,))([z_mean, z_log_var]) 
+z = Lambda(sampling, output_shape=(latent_dim,))([z_mean, z_log_var])
 
 decoder_z = Dense(lstm_dim)(z)
 rv = RepeatVector(tsteps)(decoder_z)
-decoder_out = DecoderVaeLSTM(input_dim, stateful=False, return_sequences=True)(rv)
+decoder_out = DecoderVaeLSTM(input_dim, stateful=False, return_sequences=True, activation='linear')(rv)
 
-def vae_loss(x, x_decoded_mean): 
+def vae_loss(x, x_decoded_mean):
 	x_d = Flatten()(x)
 	x_dec_d = Flatten()(x_decoded_mean)
 	xent_loss = input_dim * objectives.mean_squared_error(x_d, x_dec_d) 

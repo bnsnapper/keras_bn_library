@@ -71,7 +71,7 @@ class RBM(Layer):
 		self.bh_constraint = constraints.get(bh_constraint)
 
 		self.initial_weights = weights
-		self.input_spec = [InputSpec(ndim=2)]
+		self.input_spec = [InputSpec(ndim='2+')]
 	
 		if self.input_dim:
 			kwargs['input_shape'] = (self.input_dim,)
@@ -80,25 +80,31 @@ class RBM(Layer):
 
 
 		if(Wrbm == None):
-			self.Wrbm = self.init((input_dim, self.hidden_dim),
-								name='{}_Wrbm'.format(self.name))
+			self.Wrbm = self.add_weight((input_dim, self.hidden_dim),
+									initializer=self.init,
+									name='{}_Wrbm'.format(self.name),
+									regularizer=self.Wrbm_regularizer,
+									constraint=self.Wrbm_constraint)
 		else:
 			self.Wrbm = Wrbm
 
 		if(bx == None):
-			self.bx = K.zeros((self.input_dim),
-								name='{}_bx'.format(self.name))
+			self.bx = self.add_weight((self.input_dim,),
+								initializer='zero',
+								name='{}_bx'.format(self.name),
+								regularizer=self.bx_regularizer,
+								constraint=self.bx_constraint)
 		else:
 			self.bx = bx
 
 		if(bh == None):
-			self.bh = K.zeros((self.hidden_dim),
-								name='{}_bh'.format(self.name))
+			self.bh = self.add_weight((self.hidden_dim,),
+								initializer='zero',
+								name='{}_bh'.format(self.name),
+								regularizer=self.bh_regularizer,
+								constraint=self.bh_constraint)
 		else:
 			self.bh = bh
-
-		self.trainable_weights = [self.Wrbm, self.bx, self.bh]
-
 
 		if(self.is_persistent):
 			self.persistent_chain = K.variable(np.zeros((self.batch_size, self.input_dim), 
@@ -110,38 +116,11 @@ class RBM(Layer):
 
 	def build(self, input_shape):
 		assert len(input_shape) == 2
-
-		input_dim = input_shape[1]
+		input_dim = input_shape[-1]
 		self.input_spec = [InputSpec(dtype=K.floatx(),
-		                             shape=(None, input_dim))]
+									ndim='2+')]
+
 		#self.trainable_weights = [self.W, self.bx, self.bh]
-
-		self.regularizers = []
-		if self.Wrbm_regularizer:
-			self.Wrbm_regularizer.set_param(self.W)
-			self.regularizers.append(self.Wrbm_regularizer)
-
-		if self.bx_regularizer:
-			self.bx_regularizer.set_param(self.bx)
-			self.regularizers.append(self.bx_regularizer)
-
-		if self.bh_regularizer:
-			self.bh_regularizer.set_param(self.bh)
-			self.regularizers.append(self.bh_regularizer)
-
-		if self.activity_regularizer:
-			self.activity_regularizer.set_layer(self)
-			self.regularizers.append(self.activity_regularizer)
-
-		self.constraints = {}
-		if self.Wrbm_constraint:
-			self.constraints[self.Wrbm] = self.Wrbm_constraint
-
-		if self.bx_constraint:
-			self.constraints[self.bx] = self.bx_constraint
-
-		if self.bh_constraint:
-			self.constraints[self.bh] = self.bh_constraint
 
 		if self.initial_weights is not None:
 			self.set_weights(self.initial_weights)

@@ -5,7 +5,9 @@ np.random.seed(1234)
 
 from keras.models import Sequential
 from keras.optimizers import SGD, RMSprop
-from keras.layers import Dense
+from keras.layers import Dense, Flatten
+from keras_extensions.rbm import RBM
+from keras_extensions.initializations import glorot_uniform_sigm
 from keras_extensions.rnnrbm import RNNRBM
 import matplotlib.pyplot as plt
 
@@ -13,7 +15,7 @@ import matplotlib.pyplot as plt
 tsteps = 1
 lahead = 1
 batch_size = 25
-epochs = 50
+epochs = 10
 epochs_ft = 25
 
 hidden_dim = 10
@@ -56,25 +58,25 @@ for i in range(len(cos) - lahead):
 print('Output shape')
 print(expected_output.shape)
 
-print('Creating Model')
-rnnrbm = RNNRBM(hidden_dim, hidden_recurrent_dim,
-				batch_input_shape=(batch_size, tsteps, input_dim),
-				return_sequences=False,
-				stateful=stateful,
-				nb_gibbs_steps=20,
-				persistent=True,
-				pretrain_rbm=True,
-				dropout_U=0.0, dropout_W=0.0, dropout_RBM=0.0)
-
-
 print('Training Pretrain RBM')
+rbm = RBM(hidden_dim,
+		init=glorot_uniform_sigm,
+		input_dim=input_dim,
+		hidden_unit_type='binary',
+		visible_unit_type='gaussian',
+		persistent=True,
+		batch_size=batch_size,
+		nb_gibbs_steps=10
+		)
+
 model = Sequential()
-model.add(rnnrbm)
+model.add(Flatten(batch_input_shape=(batch_size, tsteps, input_dim)))
+model.add(rbm)
 
 opt = RMSprop(lr=lr)
-model.compile(loss=rnnrbm.loss,
+model.compile(loss=rbm.contrastive_divergence_loss,
 			  optimizer=opt,
-			  metrics=[rnnrbm.metrics])
+			  metrics=[rbm.reconstruction_loss])
 model.summary()
 
 for i in range(epochs):
@@ -89,8 +91,18 @@ for i in range(epochs):
 		model.reset_states()
 
 
+
 print('Training Pretrain RNNRBM')
-rnnrbm.set_train()
+rnnrbm = RNNRBM(hidden_dim, hidden_recurrent_dim,
+				batch_input_shape=(batch_size, tsteps, input_dim),
+				return_sequences=False,
+				stateful=stateful,
+				activation="tanh",
+				nb_gibbs_steps=10,
+				persistent=True,
+				rbm=rbm,
+				dropout_U=0.0, dropout_W=0.0, dropout_RBM=0.0)
+
 model = Sequential()
 model.add(rnnrbm)
 

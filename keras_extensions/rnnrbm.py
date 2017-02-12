@@ -16,6 +16,7 @@ from keras.layers.recurrent import Recurrent, SimpleRNN, time_distributed_dense
 from keras_extensions.initializations import glorot_uniform_sigm
 from keras_extensions.activations import nrlu
 from keras_extensions.rbm import RBM
+from keras_extensions.dbn import DBN
 
 class RNNRBM(Recurrent):
 	def __init__(self, hidden_dim, hidden_recurrent_dim,
@@ -26,7 +27,8 @@ class RNNRBM(Recurrent):
 				nb_gibbs_steps=1,
 				persistent=False,
 				finetune=False,
-				pretrain_rbm=False,
+				Wrbm_regularizer=None,
+				rbm=None,
 				dropout_RBM=0.,
 				**kwargs):
 
@@ -39,6 +41,8 @@ class RNNRBM(Recurrent):
 		self.b_regularizer = regularizers.get(b_regularizer)
 		self.dropout_W, self.dropout_U = dropout_W, dropout_U
 		self.dropout_RBM = dropout_RBM
+		self.Wrbm_regularizer = regularizers.get(Wrbm_regularizer)
+		self.rbm = rbm
 
 		if self.dropout_W or self.dropout_U or self.dropout_RBM:
 			self.uses_learning_phase = True 
@@ -51,7 +55,6 @@ class RNNRBM(Recurrent):
 		self.hidden_recurrent_dim = hidden_recurrent_dim
 		self.nb_gibbs_steps = nb_gibbs_steps
 		self.persistent = persistent
-		self.pretrain_rbm = pretrain_rbm
 
 	def get_output_shape_for(self, input_shape):
 		#assert input_shape and len(input_shape) == 2
@@ -59,12 +62,12 @@ class RNNRBM(Recurrent):
 
 	def build(self, input_shape):
 		self.input_spec = [InputSpec(shape=input_shape)]
-		self.input_dim = input_shape[2]
+		input_dim = input_shape[2]
+		self.input_dim = input_dim
 
 		if self.stateful:
 			self.reset_states()
 		else:
-		    #self.states = [K.zeros((input_shape[0], self.hidden_recurrent_dim)), None, None]
 			self.states = [None, None, None]
 			self.states_dim = [self.hidden_recurrent_dim, self.input_dim, self.hidden_dim]
 
@@ -74,48 +77,57 @@ class RNNRBM(Recurrent):
 			self.output_dim = self.hidden_dim
 
 		if(not hasattr(self, 'W')):
-			self.W = self.init((self.input_dim, self.hidden_recurrent_dim),
-			                   name='{}_W'.format(self.name))
-			self.U = self.inner_init((self.hidden_recurrent_dim, self.hidden_recurrent_dim),
-			                   name='{}_U'.format(self.name))
-			self.b = K.zeros((self.hidden_recurrent_dim,), name='{}_b'.format(self.name))
-
-			self.regularizers = []
-			if self.W_regularizer:
-				self.W_regularizer.set_param(self.W)
-				self.regularizers.append(self.W_regularizer)
-			if self.U_regularizer:
-				self.U_regularizer.set_param(self.U)
-				self.regularizers.append(self.U_regularizer)
-			if self.b_regularizer:
-				self.b_regularizer.set_param(self.b)
-				self.regularizers.append(self.b_regularizer)
+			self.W = self.add_weight((input_dim, self.hidden_recurrent_dim),
+									initializer=self.init,
+									name='{}_W'.format(self.name),
+									regularizer=self.W_regularizer)
+			self.U = self.add_weight((self.hidden_recurrent_dim, self.hidden_recurrent_dim),
+									initializer=self.inner_init,
+									name='{}_U'.format(self.name),
+									regularizer=self.U_regularizer)
+			self.b = self.add_weight((self.hidden_recurrent_dim,),
+									initializer='zero',
+									name='{}_b'.format(self.name),
+									regularizer=self.b_regularizer)
 
 			if self.initial_weights is not None:
 				self.set_weights(self.initial_weights)
 				del self.initial_weights
 
-			self.Wrbm = self.init_rbm((self.input_dim, self.hidden_dim),
-							name='{}_Wrbm'.format(self.name))
-			self.Wuv = self.init((self.hidden_recurrent_dim, self.input_dim),
-			                   name='{}_Wuv'.format(self.name))
-			self.Wuh = self.init((self.hidden_recurrent_dim, self.hidden_dim),
-			                   name='{}_Wuh'.format(self.name))
-			self.bv = K.zeros((self.input_dim,), name='{}_bv'.format(self.name))
-			self.bh = K.zeros((self.hidden_dim,), name='{}_bh'.format(self.name))
+			if(self.rbm):
+				self.Wrbm = self.rbm.Wrbm
+				self.bv = self.rbm.bx
+				self.bh = self.rbm.bh
+			else:
+				self.Wrbm = self.add_weight((input_dim, self.hidden_dim),
+										initializer=self.init_rbm,
+										name='{}_Wrbm'.format(self.name),
+										regularizer=self.Wrbm_regularizer)
+				self.bv = self.add_weight((self.input_dim,),
+										initializer='zero',
+										name='{}_bv'.format(self.name),
+										regularizer=None)
+				self.bh = self.add_weight((self.hidden_dim,),
+										initializer='zero',
+										name='{}_bh'.format(self.name),
+										regularizer=None)
 
-		if(self.pretrain_rbm):
-			self.params = self.Wrbm, self.bv, self.bh
-			self.trainable_weights = [self.Wrbm, self.bv, self.bh]
-		else:
-			self.params = self.W, self.U, self.b, self.Wuv, self.Wuh, self.bv, self.bh
-			self.trainable_weights = [self.W, self.U, self.b, self.Wrbm, self.Wuh, self.bh]
+			self.Wuv = self.add_weight((self.hidden_recurrent_dim, input_dim),
+									initializer=self.init,
+									name='{}_Wuv'.format(self.name),
+									regularizer=None)
+			self.Wuh = self.add_weight((self.hidden_recurrent_dim, self.hidden_dim),
+									initializer=self.init,
+									name='{}_Wuh'.format(self.name),
+									regularizer=None)
 
-			if(not self.finetune):
-				self.trainable_weights.append(self.Wuv)
-				self.trainable_weights.append(self.bv)
+		self.trainable_weights = [self.W, self.U, self.b, self.Wrbm, self.Wuh, self.bh]
 
-		#self.built = False
+		if(not self.finetune):
+			self.trainable_weights.append(self.Wuv)
+			self.trainable_weights.append(self.bv)
+
+		self.built = True
 
 	
 	def reset_states(self):
@@ -141,7 +153,7 @@ class RNNRBM(Recurrent):
 
 	def preprocess_input(self, x):
 		if self.consume_less == 'cpu':
-			input_shape = self.input_spec[0].shape
+			input_shape = K.int_shape(x)
 			input_dim = input_shape[2]
 			timesteps = input_shape[1]
 			return time_distributed_dense(x, self.W, self.b, self.dropout_W,
@@ -188,8 +200,6 @@ class RNNRBM(Recurrent):
 		else:
 			constants.append(K.cast_to_floatx(1.))
 
-		#constants.extend(self.params)
-
 		return constants
 
 	def get_initial_states(self, x):
@@ -207,25 +217,6 @@ class RNNRBM(Recurrent):
 	def call(self, x, mask=None):
 
 		input_shape = self.input_spec[0].shape
-		
-		if(self.pretrain_rbm):
-			self.pre_rbm = RBM(self.hidden_dim,init=glorot_uniform_sigm,
-							input_dim=self.input_dim,
-							hidden_unit_type='binary',
-							visible_unit_type='gaussian',
-							persistent=self.persistent, 
-							batch_size=self.batch_input_shape[0],
-							nb_gibbs_steps=self.nb_gibbs_steps, 
-							Wrbm=self.Wrbm, bx=self.bv, bh=self.bh,
-							dropout=self.dropout_RBM)
-			self.pre_rbm.build([input_shape[0], self.input_dim])
-			self.loss = self.pre_rbm.contrastive_divergence_loss
-			self.metrics = self.pre_rbm.reconstruction_loss
-
-			x = K.reshape(x, (-1, self.input_dim))
-
-			return x
-
 
 		if self.unroll and input_shape[1] is None:
 			raise ValueError('Cannot unroll a RNN if the '
@@ -239,8 +230,7 @@ class RNNRBM(Recurrent):
 		                 '- If using the functional API, specify '
 		                 'the time dimension by passing a `shape` '
 		                 'or `batch_shape` argument to your Input layer.')
-			
-		#initial_states = self.states
+
 		if self.stateful:
 			initial_states = self.states
 		else:
@@ -267,36 +257,28 @@ class RNNRBM(Recurrent):
 		bh_t = states[2]
 
 		if(not self.finetune):
+			self.rbm_rnn = RBM(self.hidden_dim,init=glorot_uniform_sigm,
+								input_dim=self.input_dim,
+								hidden_unit_type='binary',
+								visible_unit_type='gaussian',
+								persistent=self.persistent, 
+								batch_size=self.batch_input_shape[0],
+								nb_gibbs_steps=self.nb_gibbs_steps, 
+								Wrbm=self.Wrbm, bx=bv_t, bh=bh_t,
+								dropout=self.dropout_RBM)
+			self.rbm_rnn.build([input_shape[0], self.input_dim])
 
-			self.rbm = RBM(self.hidden_dim,init=glorot_uniform_sigm,
-							input_dim=self.input_dim,
-							hidden_unit_type='binary',
-							visible_unit_type='gaussian',
-							persistent=self.persistent, 
-							batch_size=self.batch_input_shape[0],
-							nb_gibbs_steps=self.nb_gibbs_steps, 
-							Wrbm=self.Wrbm, bx=bv_t, bh=bh_t,
-							dropout=self.dropout_RBM)
-			self.rbm.build([input_shape[0], self.input_dim])
-			self.rbm.trainable_weights = [self.rbm.Wrbm]
-		
-			#self.regularizer.append(self.rbm.regularizer)
-			#self.constraint.append(self.rbm.constraint)
-			self.loss = self.rbm.contrastive_divergence_loss
-			self.metrics = self.rbm.reconstruction_loss
+			self.loss = self.rbm_rnn.contrastive_divergence_loss
+			self.metrics = self.rbm_rnn.reconstruction_loss
 
 		x = K.reshape(x, (-1, self.input_dim))
 		
 		if(not self.finetune):
 			return x
 		else:
+			#return K.sigmoid(K.dot(x, self.Wrbm) + bh_t)
 			return K.dot(x, self.Wrbm) + bh_t
 			#return last_output
-
-	def set_train(self):
-		self.pretrain_rbm = False
-		self.built = False
-		self.inbound_nodes = []
 
 	def set_finetune(self):
 		self.finetune = True
@@ -313,12 +295,23 @@ class RNNRBM(Recurrent):
 			'W_regularizer': self.W_regularizer.get_config() if self.W_regularizer else None,
 			'U_regularizer': self.U_regularizer.get_config() if self.U_regularizer else None,
 			'b_regularizer': self.b_regularizer.get_config() if self.b_regularizer else None,
+			'W_regularizer': self.Wrbm_regularizer.get_config() if self.Wrbm_regularizer else None,
 			'dropout_W': self.dropout_W,
 			'dropout_U': self.dropout_U,
+			'dropout_RBM': self.dropout_RBM,
 			'nb_gibbs_steps' : self.nb_gibbs_steps, 
 			'persistent' : self.persistent,
-			'finetune' : self.finetune,
-			'pretrain_rbm' : self.pretrain_rbm
+			'finetune' : self.finetune
 		}
 		base_config = super(RNNRBM, self).get_config()
 		return dict(list(base_config.items()) + list(config.items()))
+
+########################################################################
+#
+#
+#
+#                               RNN-DBN
+#
+#
+#
+########################################################################

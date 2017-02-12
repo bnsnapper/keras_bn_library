@@ -36,3 +36,14 @@ class SampleBernoulli(Layer):
 			return nrlu(x)
 		else:
 			raise NotImplementedError('Unknown sample mode!')
+
+class KLDscheduler(Layer):
+
+	def __init__(self, beta, init=0.01, scale=1.1, max=1.0, **kwargs):
+
+		self.updates = {beta : beta * scale}
+
+		super(KLDscheduler, self).__init__(**kwargs)
+
+	def call(self, x, mask=None):
+		return 1.0*x
